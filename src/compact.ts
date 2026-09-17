@@ -176,11 +176,12 @@ export async function compact(
     }
   }
 
+  const answerRecord = Object.fromEntries(answers);
   const decisions = chunks.map((chunk) => {
     if (chunk.pinned) return baseDecision(chunk, 'pinned');
     if (chunk.turn >= recentCutoff) return baseDecision(chunk, 'recent');
-    const kindAnswer = choiceAnswer(Object.fromEntries(answers), chunk.id);
-    const drop = dropAnswer(Object.fromEntries(answers), chunk.id);
+    const kindAnswer = choiceAnswer(answerRecord, chunk.id);
+    const drop = dropAnswer(answerRecord, chunk.id);
     const decision: ChunkDecision = {
       id: chunk.id,
       drop,
