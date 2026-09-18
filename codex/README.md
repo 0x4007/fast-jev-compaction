@@ -8,10 +8,10 @@ other request unchanged. Architecture decisions: [`../DECISIONS.md`](../DECISION
 
 ```sh
 npm run build   # codex/ imports the built dist/ output
-deno run --allow-net=127.0.0.1,api.typesafe.ai --allow-env=TYPESAFE_API_KEY codex/jev-compaction-proxy.ts
+deno run --allow-net=0.0.0.0:8787,127.0.0.1,api.typesafe.ai --allow-env=TYPESAFE_API_KEY codex/jev-compaction-proxy.ts
 ```
 
-Product defaults are fixed: bind `127.0.0.1:8787`, upstream
+Product defaults are fixed: bind `0.0.0.0:8787`, upstream
 `http://127.0.0.1:8000`, Jev key `TYPESAFE_API_KEY`. The network allowlist must
 cover both the loopback upstream and the TypeSafe endpoint
 (`https://api.typesafe.ai/v1/systemone`); `TYPESAFE_API_KEY` is the only

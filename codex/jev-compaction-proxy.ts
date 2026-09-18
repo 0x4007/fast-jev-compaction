@@ -2,10 +2,10 @@
  * Loopback Responses proxy that answers Codex's *local* compaction request with
  * a Jev-compacted transcript, and forwards everything else byte-transparently.
  *
- * Run:  deno run --allow-net=127.0.0.1,api.typesafe.ai --allow-env=TYPESAFE_API_KEY codex/jev-compaction-proxy.ts
+ * Run:  deno run --allow-net=0.0.0.0:8787,127.0.0.1,api.typesafe.ai --allow-env=TYPESAFE_API_KEY codex/jev-compaction-proxy.ts
  *
  * Product configuration is fixed (no env knobs, no CLI flags):
- *   bind 127.0.0.1:8787, upstream http://127.0.0.1:8000, Jev key TYPESAFE_API_KEY.
+ *   bind 0.0.0.0:8787 (all interfaces, LAN + loopback), upstream http://127.0.0.1:8000, Jev key TYPESAFE_API_KEY.
  *   The Jev HTTP call is bounded at 30 s by an adapter-owned fetch wrapper.
  * `startProxy` takes internal options so tests can inject ephemeral ports, a
  * fake upstream origin, and a fake Jev asker. Nothing here reads conversation
@@ -602,7 +602,8 @@ export async function startProxy(options: ProxyOptions = {}): Promise<RunningPro
 }
 
 if (import.meta.main) {
-  const running = await startProxy();
+  // Product entrypoint binds all interfaces so the gateway UI is reachable on the LAN; the library default stays loopback.
+  const running = await startProxy({ hostname: '0.0.0.0' });
   const stop = async (): Promise<void> => {
     await running.close();
     Deno.exit(0);

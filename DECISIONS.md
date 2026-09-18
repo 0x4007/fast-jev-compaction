@@ -82,3 +82,11 @@ PASS/failure class.
 The proxy logs structural counts and fixed failure classifications only: no
 transcript text, tool output, provider bodies, or credentials. Test diagnostics
 follow the same rule and print synthetic markers or structural fields only.
+
+## D7 — The installed proxy listens on the LAN (owner request 2026-09-18)
+
+The product entrypoint binds `0.0.0.0:8787`; `startProxy` defaults remain
+loopback. The gateway UI is reachable at `http://<mac-ip>:8787` from the local
+network by explicit owner request. The gateway still applies its own
+loopback-peer and Origin checks to forwarded requests, so behavior on the LAN
+matches the existing proxy semantics. Run only on a trusted network.
