@@ -180,6 +180,15 @@ See [`codex/README.md`](codex/README.md) for the provider config, boundary,
 privacy, fidelity, acceptance, and rollback, and [`DECISIONS.md`](DECISIONS.md)
 for the architecture record.
 
+## Compact-on-demand experiment (M0)
+
+`vendor/codex` is a git submodule pinning the Codex client source under study
+(`5c583fe89bbd3ab4dc9a05768299f94e52fe8452`), and
+[`docs/compact-on-demand/`](docs/compact-on-demand/M0-spec.md) holds the
+milestone specs: M1 per-request working-set selection, M2 mock Responses tests,
+and M3 a bounded real-model smoke test. Nothing here changes the shipping
+`codex/` proxy, which keeps its current behaviour.
+
 ## Development
 
 ```sh
