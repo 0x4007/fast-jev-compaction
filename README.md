@@ -162,6 +162,24 @@ To run from a checkout without installing: `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 
 from the repository root. No publishing step is required; the marketplace is
 just the repo's `.claude-plugin/marketplace.json`.
 
+## Codex adapter
+
+`codex/` adds the same idea to Codex's local compaction. `codex/jev-compaction-proxy.ts`
+is a Deno loopback proxy (`127.0.0.1:8787` → existing gateway on `127.0.0.1:8000`)
+that intercepts only the header-marked local-compaction request and answers it
+with a Jev-rendered text memory; every other request is forwarded unchanged. On
+any failure Codex keeps its original history. No new environment variables,
+secrets, or CLI flags: it reuses `TYPESAFE_API_KEY`.
+
+```sh
+npm run build
+deno run --allow-net=127.0.0.1,api.typesafe.ai --allow-env=TYPESAFE_API_KEY codex/jev-compaction-proxy.ts
+```
+
+See [`codex/README.md`](codex/README.md) for the provider config, boundary,
+privacy, fidelity, acceptance, and rollback, and [`DECISIONS.md`](DECISIONS.md)
+for the architecture record.
+
 ## Development
 
 ```sh

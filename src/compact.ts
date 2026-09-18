@@ -132,7 +132,12 @@ async function askBatch(
   );
 }
 
-function truncatedResultText(text: string, isError: boolean, headChars: number): string {
+/**
+ * The bounded head plus notice a `drop_result` decision leaves behind.
+ * Exported so renderers outside `applyDecisions` (the Codex adapter) reuse the
+ * exact same truncation semantics instead of duplicating them.
+ */
+export function truncatedResultText(text: string, isError: boolean, headChars: number): string {
   if (text.length <= headChars + 120) return text;
   const head = headChars > 0 ? `${text.slice(0, headChars)}\n` : '';
   return `${head}[fast-jev-compaction truncated ${text.length - headChars} chars of this tool result${
