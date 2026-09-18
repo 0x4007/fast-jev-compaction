@@ -21,10 +21,10 @@ token count**, then test that change against a mock Responses server (M2) and a
 bounded real `gpt-5.6-luna` request at reasoning `none` first, falling back to
 `low` only if `none` is rejected (the real-model objective).
 
-Note: the real-model objective and M3's target are the model `gpt-5.6-luna` at
-the exact provider slug `gpt-6-astra` (`M3-real-luna-spec.md`). `gpt-6-astra` is
-the unrelated context-window model and is **not** M3. The two slugs are distinct
-live catalog entries.
+Note: the real-model objective and M3's target are the exact provider slug
+`gpt-5.6-luna`, with the `low` fallback only if `none` is rejected
+(`M3-real-luna-spec.md`). `gpt-6-astra` is the unrelated context-window model and
+is **not** M3. The two slugs are distinct live catalog entries.
 
 M0 itself changes no product behavior. It fixes the source pin, the invariants
 shared by M1–M3, the ownership boundaries, and the acceptance surface.
