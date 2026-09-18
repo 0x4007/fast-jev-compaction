@@ -118,3 +118,29 @@ answers successfully, so reverting the provider restores Codex's own behaviour.
   can re-run a tool but cannot reconstruct exact call items.
 - Token accounting is the library's estimate; Codex's own usage numbers are not
   invented.
+
+## Testing the installed proxy
+
+`codex/test-cli.ts` exercises the **installed** proxy at
+`http://127.0.0.1:8787` end to end: it sends exactly one header-marked
+compaction request (`x-codex-turn-metadata` with
+`{"request_kind":"compaction","compaction":{"implementation":"responses"}}`),
+parses the SSE summary, and reports timings, sizes, the reduction ratio, the
+structural counts from the `x-fast-jev-compaction` header, and a clear PASS/FAIL
+line. The synthetic fixture transcript carries three obsolete tool pairs and one
+goal marker; the run passes only when the summary keeps the goal marker, drops
+all three obsolete markers, and the response carries the structural header.
+
+```sh
+deno run --allow-net=127.0.0.1 codex/test-cli.ts
+deno run --allow-net=127.0.0.1 --allow-read="$HOME/.codex/sessions" codex/test-cli.ts --rollout latest
+deno run --allow-net=127.0.0.1 --allow-read="$HOME/.codex/sessions" codex/test-cli.ts --rollout latest --send
+```
+
+`--send` is rollout-only; without it the run is a strict dry run that prints the
+extracted item counts, sizes, matched tool pairs, and a bounded excerpt, and
+makes no network or Jev call. Privacy boundary: `--send` sends the extracted
+transcript to the TypeSafe endpoint through the installed proxy; the dry run
+sends nothing. The CLI never reads the API key and never prints a request
+payload body; `--json` prints one object instead of the human report, and the
+exit code is 0 on pass, 1 on fail or error.
