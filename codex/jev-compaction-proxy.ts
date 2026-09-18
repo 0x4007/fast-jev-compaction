@@ -100,6 +100,11 @@ export interface ProxyOptions {
   log?: (line: string) => void;
 }
 
+/** True when a browser request targets the proxy's own origin (the only case that may be rewritten to the upstream origin). */
+export function isProxySameOrigin(origin: string | null, requestOrigin: string): boolean {
+  return origin !== null && origin === requestOrigin;
+}
+
 export interface RunningProxy {
   hostname: string;
   port: number;
@@ -446,6 +451,7 @@ export async function startProxy(options: ProxyOptions = {}): Promise<RunningPro
   const hostname = options.hostname ?? DEFAULT_HOSTNAME;
   const port = options.port ?? DEFAULT_PORT;
   const upstreamOrigin = options.upstreamOrigin ?? DEFAULT_UPSTREAM_ORIGIN;
+  const upstreamOriginValue = new URL(upstreamOrigin).origin;
   const fetcher = options.fetch ?? fetch;
   const log = options.log ?? ((line: string) => console.log(`[codex-jev] ${line}`));
   const asker: JevAsker = options.asker ??
@@ -487,6 +493,13 @@ export async function startProxy(options: ProxyOptions = {}): Promise<RunningPro
     for (const [name, value] of request.headers) {
       if (!HOP_BY_HOP.has(name.toLowerCase())) headers.set(name, value);
     }
+    // Browser clients reach the proxy on its own origin, but the gateway grants
+    // local trust only when Origin is absent or equals the origin it sees (the
+    // loopback upstream). Rewrite exactly that same-origin case so LAN and
+    // localhost UIs pass the gateway's check; foreign origins are left
+    // untouched and still rejected upstream.
+    const origin = request.headers.get('origin');
+    if (isProxySameOrigin(origin, url.origin)) headers.set('origin', upstreamOriginValue);
     const init: RequestInit = { method: request.method, headers, redirect: 'manual' };
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       init.body = request.body;

@@ -332,3 +332,14 @@ describe('Jev timeout wiring', () => {
     ).rejects.toThrow('Jev request timed out after 20ms');
   });
 });
+
+describe('isProxySameOrigin', () => {
+  it('accepts only the exact proxy origin', async () => {
+    const { isProxySameOrigin } = await import('../codex/jev-compaction-proxy.js');
+    expect(isProxySameOrigin('http://192.168.4.47:8787', 'http://192.168.4.47:8787')).toBe(true);
+    expect(isProxySameOrigin('http://127.0.0.1:8787', 'http://127.0.0.1:8787')).toBe(true);
+    expect(isProxySameOrigin('https://evil.example', 'http://192.168.4.47:8787')).toBe(false);
+    expect(isProxySameOrigin(null, 'http://192.168.4.47:8787')).toBe(false);
+    expect(isProxySameOrigin('http://192.168.4.47:8787', 'http://127.0.0.1:8787')).toBe(false);
+  });
+});

@@ -90,3 +90,14 @@ loopback. The gateway UI is reachable at `http://<mac-ip>:8787` from the local
 network by explicit owner request. The gateway still applies its own
 loopback-peer and Origin checks to forwarded requests, so behavior on the LAN
 matches the existing proxy semantics. Run only on a trusted network.
+
+## D8 — Same-origin Origin rewrite in passthrough (owner request 2026-09-18)
+
+Browser clients reach the proxy on its own origin. The gateway grants local
+trust only when `Origin` is absent or equals the origin it observes (the
+loopback upstream); a phone at `http://<mac-ip>:8787` would otherwise get 401 on
+every API call even though the UI page loads. The passthrough therefore rewrites
+`Origin` to the upstream origin only when it exactly equals the proxy's own
+request origin; absent and foreign origins are forwarded untouched and still
+rejected upstream. Cross-site requests stay rejected.
+
