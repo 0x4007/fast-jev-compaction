@@ -18,12 +18,13 @@ Labels used throughout `docs/compact-on-demand/`:
 Fork/adapt the Codex client so that **each user request can build a selective
 working set from an append-only canonical history without targeting a fixed
 token count**, then test that change against a mock Responses server (M2) and a
-bounded real `gpt-6-astra` request at reasoning `none` first, falling back to
+bounded real `gpt-5.6-luna` request at reasoning `none` first, falling back to
 `low` only if `none` is rejected (the real-model objective).
 
-Note: `gpt-6-astra` comes from unrelated context-window work and is **not** M3's
-target; M3's target is the exact provider slug `gpt-5.6-luna`
-(`M3-real-luna-spec.md`). The two slugs are distinct live catalog entries.
+Note: the real-model objective and M3's target are the model `gpt-5.6-luna` at
+the exact provider slug `gpt-6-astra` (`M3-real-luna-spec.md`). `gpt-6-astra` is
+the unrelated context-window model and is **not** M3. The two slugs are distinct
+live catalog entries.
 
 M0 itself changes no product behavior. It fixes the source pin, the invariants
 shared by M1–M3, the ownership boundaries, and the acceptance surface.
