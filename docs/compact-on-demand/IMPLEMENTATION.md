@@ -389,6 +389,44 @@ host-timing property of this machine, not a regression introduced here. The
 full-run counts differ only by the new tests: 241 filtered at the base pin vs
 279 executed at the fork tip.
 
+### 5.3.1 Live finding: projection needs prior usage evidence in the same process
+
+The live two-turn run in §5.2.2 is the first end-to-end exercise of the selector
+against a model that actually has a recorded catalog (`gpt-5.6-luna`). It
+exposed a limitation that the mock suites cannot show, because they never assert
+`applied === true`:
+
+- **Turn 2 selected correctly but still fell back.** The manifest shows a real
+  projection computed — `canonical.log_len 4`, `projection.len 3`,
+  `omitted 1`, `retrieval [{rule: anchor, anchor_count: 1}]`, catalog
+  `openrouter-2026-09-19-5ecb4fe3`, currency `USD`, unit `per_1m_tokens` — yet
+  `applied false` with `selection_reason pricing_unknown`.
+
+**Mechanism.** The only entry in `cost.unknown_fields` is
+`expected_output_tokens`. `cost_basis` returns `None` (and records that field)
+when `inputs.usage` is `None`, and a `None` amount forces
+`confidence = low`, which forces `applied = false` and the canonical send. The
+usage input is `Session::last_token_usage()`, which reads in-memory
+`state.token_info`; `reconstruct_history_from_rollout` rebuilds conversation
+items only and never restores token usage across a process boundary.
+
+**Consequence.** With `exec`, every invocation is one process, and
+`exec resume` starts a new one, so `last_token_usage()` is `None` on the first
+user request of every `exec`/`exec resume` turn and projection can never apply
+there — the selector always records the honest `pricing_unknown` fallback.
+Projection *does* apply when two user requests share one process, which is what
+`working_set_projection_reduces_wire_and_keeps_canonical_history` proves
+in-process (`applied true`, `turn.decision projected`), and what a long-lived
+interactive/TUI session would exercise.
+
+This is a conservative-behaviour limitation, not a defect: refusing to estimate
+output cost without usage evidence is exactly the documented I10/I12 rule, and
+the fallback is recorded rather than hidden. It does mean the feature's wire
+reduction is currently only reachable inside a single long-lived process, and
+that closing the gap would require either restoring usage evidence on resume or
+an explicitly recorded default output estimate. Neither is implemented here;
+both are out of scope for this slice and are recorded rather than papered over.
+
 ### 5.4 Inference-model compliance audit
 
 The owner's standing rule is: **never use Astra for inference tests; the live
