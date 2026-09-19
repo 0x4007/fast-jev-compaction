@@ -37,9 +37,9 @@ Location: fork worktree
 branch `codex/completion-handoff-2026-09-18-m01-client-a788f68d68d`, base pin
 `5c583fe89bbd3ab4dc9a05768299f94e52fe8452` (the original `vendor/codex` gitlink).
 The implementation is committed and pushed to `origin`. The accepted tip is
-`a1f65cce2d339a5e4324e237f1b0dab319f1f672` (`fix(core): restore the previous
-working-set epoch from the sidecar on resume`), and the parent `vendor/codex`
-gitlink now points at that exact commit. The change set is `core/src/working_set.rs` (new),
+`7e6fd8b1b8ae5d24e2c220b3cf3ca63d58e075e6` (`fix(core): record the documented
+GPT-5.6 minimum cacheable prefix`), and the parent `vendor/codex` gitlink now
+points at that exact commit. The change set is `core/src/working_set.rs` (new),
 `core/src/codex.rs`, `core/src/rollout/list.rs`, `core/src/lib.rs`,
 `protocol/src/config_types.rs`, `tui/src/history_cell.rs` (one line),
 `core/Cargo.toml`, and `Cargo.lock`. `rollout/list.rs` is the product fix for
@@ -435,33 +435,43 @@ Resume now reads the newest `turn.epoch_id` (falling back to the newest
 `selection.manifest.epoch.epoch_id`) from the sidecar into
 `state.last_working_set_epoch`.
 
-**Live result after both fixes**, exact `gpt-5.6-luna`, effort `none`, resume
+**Fix 3 — record the documented minimum cacheable prefix (`7e6fd8b1`).** Even
+with the epoch restored, turn 2 stopped on `cache_ineligible` /
+`min_cacheable_prefix_unknown`: the recorded `gpt-5.6-luna` catalog left
+`min_cacheable_prefix_tokens: None`, so `cache_charge` could never claim cache
+eligibility. OpenRouter does not publish this field (verified: none of the 447
+models carry it, and the gateway does not model it), but OpenAI documents it:
+
+> "The minimum cacheable prompt length is 1,024 tokens for GPT-5.6 and later
+> and varies by request settings for earlier models." … "Tokens in the
+> OpenAI-provided hidden system content do not count toward this minimum."
+> — `https://platform.openai.com/docs/guides/prompt-caching`
+
+The catalog now records `Some(1024)` with that provenance in the constant's doc
+comment, rather than inferring a value.
+
+**Live result after all three fixes**, exact `gpt-5.6-luna`, effort `none`,
 across a process boundary. Both turns answered correctly, so canonical history
 stayed intact:
 
-| Turn | applied | reason | epoch.changed | candidate / baseline |
+| Turn | applied | reason | candidate / baseline | canonical → wire |
 | --- | --- | --- | --- | --- |
-| 1 | false | `retrieval_insufficient` | true (no prior) | 136 / 136 tokens |
-| 2 (resume) | false | **`cache_ineligible`** | true | 4.2e-05 / 5.62e-05 USD |
+| 1 | false | `retrieval_insufficient` | 136 / 136 tokens | 2 → 2 |
+| 2 (resume) | **true** | **`lower_expected_cost`** | **4.2e-05 / 5.62e-05 USD** | **4 → 3** |
 
-The epoch restore **worked** — turn 2's candidate is now charged with
-`min_cacheable_prefix_unknown` instead of `changed_epoch_cache_write`, meaning
-it reached the cached-prefix branch it previously could not. That branch then
-stopped on a catalog gap: the production `gpt-5.6-luna` record carries
-`min_cacheable_prefix_tokens: None`, and `cache_charge` refuses to claim cache
-eligibility without it (I10 — no invented values). The synthetic test catalog
-sets `Some(1)`, which is why the unit tests pass while production falls back.
+`confidence: high`, `unknown_fields: []`, `winner: candidate`. The candidate is
+charged `stable_prefix_below_min_cacheable` (136 < 1024, so no cache claim) while
+the baseline is charged a full cache write — the correct asymmetry that makes the
+projection win.
 
-**Third open item, not a bug.** OpenRouter publishes no minimum-cacheable-prefix
-field for this model (verified against the live `/v1/models` payload: only
-`prompt`, `completion`, `input_cache_read`, `input_cache_write`, `web_search`,
-`overrides`). So the selector will keep recording `cache_ineligible` on a warm
-prefix until that value comes from somewhere honest — a provider that documents
-it, or a measured value. It currently **degrades to canonical (correct and
-safe)**, and the wire therefore does not shrink on a warm resumed prefix.
+**Progression of the live decision, for the record:**
 
-Both fixes are behaviour-preserving when the data is absent: a missing or
-malformed sidecar leaves the conservative default in place.
+| State | turn-2 verdict |
+| --- | --- |
+| Original | `applied false`, `pricing_unknown` (`expected_output_tokens`) |
+| + usage restore | `applied false`, `cache_ineligible` (`min_cacheable_prefix_unknown`) |
+| + epoch restore | reached the cached-prefix branch for the first time |
+| + documented minimum | `applied true`, `projected`, wire 4 → 3 |
 
 ### 5.4 Inference-model compliance audit
 
@@ -504,7 +514,7 @@ unavailable, which is why the M3 live re-check could not produce a fresh PASS.
 | Real pinned-client loopback mock server | `compact-real-client` fresh run on committed state: 10 passed, 0 failed | met |
 | Live Luna `none` only, `low` only if required | `compact-luna-openrouter-live` PASS at exact `gpt-5.6-luna`, effort `none`; no `low` attempt, no other model used for inference | met |
 | Truthful evidence and limitations | §5.2.1–§5.3.1 record the gateway block, the alternative route, the compliance audit, and the resume/usage limitation | met |
-| Commit and push the implementation branch | Fork `a1f65cce2d` (usage + epoch restore) and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
+| Commit and push the implementation branch | Fork `7e6fd8b1b8` (usage + epoch restore + documented minimum) and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
 | Preserve unrelated work | All user checkouts clean; shipping `codex/` proxy, `src/`, `hooks/`, and the installed CLI unchanged (0 files) | met |
 | Leave the repository's own `npm test` working | The Deno harnesses are excluded from vitest's default glob via `vitest.config.ts`; `npx vitest run` reports 3 files / 45 tests passing, identical to `main` | met (fixed in `2be1e80`) |
 | Leave shipping proxy and host configuration unchanged | No product env var/flag/secret/knob added; installed CLI mtime unchanged | met |
@@ -611,7 +621,7 @@ still fails, and §5.3 proves it fails identically at the pristine base pin.
 - **Process-local indices.** `request_index`/`turn_index` restart across
   `exec resume` processes; consumers must not treat them as session-global ids.
 - **Committed and pushed state.** The fork implementation is committed and
-  pushed as `a1f65cce2d339a5e4324e237f1b0dab319f1f672` on
+  pushed as `7e6fd8b1b8ae5d24e2c220b3cf3ca63d58e075e6` on
   `codex/completion-handoff-2026-09-18-m01-client-a788f68d68d`, and the parent
   `vendor/codex` gitlink has been advanced to that exact reachable commit. The installed CLI and the shipping
   `codex/` proxy remain unchanged.
