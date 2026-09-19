@@ -204,10 +204,19 @@ defect in this feature:
 
 So the feature's own contract is satisfied on every check that does not depend
 on that provider's balance: selection is implemented, compiled, green on the
-real client, and the Luna guard enforces the exact slug and effort. The
-historical §5.1 PASS (recorded 2026-09-18, when the paid wallet was funded)
-remains the last successful live inference receipt for this exact client. A
-fresh live PASS requires the upstream wallet to be topped up; it is an owner
+real client, and the Luna guard enforces the exact slug and effort.
+
+**Binary-to-evidence mapping (stated exactly, no rounding).** The final
+`codex-exec` was built at `2026-09-19T01:32:02Z`. The real pinned-client suite
+ran at `01:34:55Z`, i.e. *against that final binary*, and is the 10/10 green
+receipt. The historical §5.1 live inference PASS ran at `01:25:25Z`, about
+seven minutes *earlier*, so it covers the pre-`rollout/list.rs` binary; the
+subsequent source delta is the resume-lookup fix, which is not on the inference
+wire path (`find_conversation_path_by_id_str` has no caller in `client.rs` or
+`codex.rs`) and therefore cannot change a single-turn live request. Even so, the
+final binary has **no** live inference PASS of its own: the only attempt,
+`e0c27beb`, was refused upstream by the exhausted wallet. A fresh live PASS on
+the final binary requires the upstream wallet to be topped up; it is an owner
 action, not a code change.
 
 ## 6. Known rough edges and limits
