@@ -172,7 +172,7 @@ HTTP 200, `responseModel` `gpt-5.6-luna`, status `completed`; usage
 artifact. No Astra request was made, the `low` fallback was never needed, and
 no token, prompt, or raw body is stored.
 
-### 5.2 Final acceptance status — real-client suite green; live Luna blocked externally
+### 5.2 Final acceptance status — real-client suite green; gateway Luna route out of balance (resolved in §5.2.3)
 
 The real pinned-client suite is now **green and freshly re-verified**: `10
 passed | 0 failed` with the `.ignore` workaround removed and the compiled
@@ -225,12 +225,13 @@ blocking for this feature.
 
 ### 5.2.1 Live wire proof of explicit `reasoning.effort = none` (2026-09-19)
 
-The GPT family (including `gpt-5.6-luna`) is unavailable tonight: every
-`gpt-5.6-*`, `gpt-6-*` request returns HTTP 403 `local:insufficient_quota`
-(§5.2), and the owner confirmed the GPT side is down. The live `none` wire path
-was therefore proven in two parts, both against the **compiled fork client**
-(`codex-exec` at `566761e77d`, sha256 `797788a6…`) pointed at a loopback
-recording proxy in front of the real gateway
+Through the gateway, the GPT family (including `gpt-5.6-luna`) was refusing
+every `gpt-5.6-*`, `gpt-6-*` request with HTTP 403 `local:insufficient_quota`
+(§5.2), and the owner confirmed the GPT side was down on that route; an
+independent route was later found to serve it (§5.2.3). Before that, the live
+`none` wire path was proven in two parts, both against the **compiled fork
+client** (`codex-exec` at `566761e77d`, sha256 `797788a6…`) pointed at a
+loopback recording proxy in front of the real gateway
 (`http://127.0.0.1:7999/v1`), with retries 0 and a fresh temp `CODEX_HOME`/cwd.
 
 1. **Funded model, real live completion.** `deepseek-v4-pro` — present in the
