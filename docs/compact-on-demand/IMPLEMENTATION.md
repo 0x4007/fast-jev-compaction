@@ -260,6 +260,48 @@ is the only one of the two that can express it.
 The wire capture is a derivative artifact, not a committed secret: it contains
 no token, prompt text, or response body.
 
+### 5.2.2 Live end-to-end run on a funded model (2026-09-19)
+
+Because the whole GPT family is down tonight, the feature was exercised live
+end to end on `deepseek-v4-pro` (in the gateway catalog, funded, HTTP 200),
+through the **compiled fork client** and the loopback recording proxy in front
+of the real gateway. Two turns of one session:
+
+- **Turn 1** (`deepseek-v4-pro`, fresh `CODEX_HOME`): exit 0, assistant `ok`,
+  usage 5801 in / 2 out. A selection sidecar was written next to the rollout:
+  `request_index 1`, `applied false`, `selection_reason retrieval_insufficient`,
+  `fallback_reason retrieval_insufficient`, `canonical.log_len 2`,
+  `projection.len 0`, plus one `turn` record with
+  `decision canonical, canonical_len 2, wire_len 2`. This is exactly the
+  documented conservative fallback for a first request with no anchors.
+- **Turn 2** (`exec resume <uuid>`, same `CODEX_HOME`): **exit 0 and the model
+  answered `ZEBRA`**, the word only present in turn 1's history. Usage 5826.
+
+The `ZEBRA` answer is the meaningful live result. It proves, in one run, that:
+
+- `resume <uuid>` still finds the correct session **with the working-set
+  sidecar present** — the `rollout/list.rs` fix works on a real resume, not
+  just in the unit test (`find_conversation_path_prefers_canonical_rollout_over_sidecar`);
+- the canonical rollout was preserved and replayed correctly across a process
+  boundary (the model recovered a fact from turn 1);
+- the sidecar appended a second `selection` and `turn` record rather than
+  rewriting the rollout (`canonical.log_len` grew 2 → 4, `append-only`).
+
+Recorded wire bodies for that session (order): `deepseek-flash` (no `reasoning`
+field — its family does not support reasoning summaries), `deepseek-v4-pro`
+(no `reasoning` field, same reason), `gpt-5.6-luna` with
+`{"effort":"none","summary":"auto"}`, then the two resume turns on
+`deepseek-v4-pro` with 2 and 4 input items.
+
+**Projection, not just fallback.** Live projection did not fire on these turns,
+and it could not have on tonight's funded models: with no recorded price
+catalog for `deepseek-v4-pro`, the selector records `pricing_unknown` /
+`cache_ineligible` and sends canonical history by design (I6/I10/I12), and
+`gpt-5.6-luna` — the one slug with a recorded catalog — is unreachable. So the
+live run proves the boundary, the sidecar, canonical preservation, resume, and
+the `none` wire; the *projection* reduction is proven by the deterministic
+fixtures and the real-client mock suite, not by tonight's live traffic.
+
 ### 5.3 The one failing core test is pre-existing and unrelated
 
 `exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now`
