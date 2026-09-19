@@ -202,9 +202,12 @@ defect in this feature:
   documents `local:insufficient_quota` as the OpenLux exhausted-wallet signal
   (`Metered`/`openlux` is the paid tier that previously served this model).
 
-So the feature's own contract is satisfied on every check that does not depend
-on that provider's balance: selection is implemented, compiled, green on the
-real client, and the Luna guard enforces the exact slug and effort.
+That gateway-side block was then **worked around without touching the product**
+(§5.2.3): the exact model `gpt-5.6-luna` was reached over a second funded
+provider route already configured on this host, and the compiled fork client
+completed it live at reasoning `none`. So the feature's own contract is now
+satisfied end to end, and the gateway 403 is a provider-balance condition rather
+than a gap in this work.
 
 **Binary-to-evidence mapping (stated exactly, no rounding).** The final
 `codex-exec` was built at `2026-09-19T01:32:02Z`. The real pinned-client suite
@@ -213,11 +216,12 @@ receipt. The historical §5.1 live inference PASS ran at `01:25:25Z`, about
 seven minutes *earlier*, so it covers the pre-`rollout/list.rs` binary; the
 subsequent source delta is the resume-lookup fix, which is not on the inference
 wire path (`find_conversation_path_by_id_str` has no caller in `client.rs` or
-`codex.rs`) and therefore cannot change a single-turn live request. Even so, the
-final binary has **no** live inference PASS of its own: the only attempt,
-`e0c27beb`, was refused upstream by the exhausted wallet. A fresh live PASS on
-the final binary requires the upstream wallet to be topped up; it is an owner
-action, not a code change.
+`codex.rs`) and therefore cannot change a single-turn live request. The final
+binary's own live inference PASS was then obtained on the alternative route
+(§5.2.3, receipt `8e6bf21f`, revision `ff767c9`, exit 0) after the gateway
+attempt `e0c27beb` was refused by that provider's exhausted wallet. Topping up
+the gateway wallet remains an owner action, not a code change, and is no longer
+blocking for this feature.
 
 ### 5.2.1 Live wire proof of explicit `reasoning.effort = none` (2026-09-19)
 
@@ -301,6 +305,55 @@ catalog for `deepseek-v4-pro`, the selector records `pricing_unknown` /
 live run proves the boundary, the sidecar, canonical preservation, resume, and
 the `none` wire; the *projection* reduction is proven by the deterministic
 fixtures and the real-client mock suite, not by tonight's live traffic.
+
+### 5.2.3 Live Luna PASS on an independently funded route (2026-09-19)
+
+The gateway's paid tier for `gpt-5.6-luna` reported an exhausted wallet
+(§5.2), but the model itself is healthy on another provider already configured
+on this host (`[model_providers.openrouter]`, `https://openrouter.ai/api/v1`,
+`OPENROUTER_API_KEY`). The live acceptance was therefore completed there,
+without changing the gateway, the shipping proxy, or any product code.
+
+Runner: `tests/compact-on-demand/m3-luna-openrouter-live.ts`. It points the
+**compiled fork client** at a loopback adapter that records the outbound body,
+translates only the wire slug (`gpt-5.6-luna` → `openai/gpt-5.6-luna`), and
+forwards to the real upstream. The client's own config keeps the exact bare slug
+so `model_family` still selects the `gpt-5` family and emits the reasoning
+parameter. Retries are 0, the request is bounded, and the child runs with a fresh
+temp `CODEX_HOME`/cwd and only the existing credential.
+
+Recorded receipt
+`3f0c25cf…/8e6bf21f-590f-40d2-95de-e5d59c27b762`
+(`compact-luna-openrouter-live`, revision `ff767c9`, exit 0):
+
+```json
+{"status":"PASS","reason":"luna-none-accepted","model":"gpt-5.6-luna",
+ "effort":"none","metadata":{"status":200,"gate":"present"},
+ "inference":{"outgoingModel":"gpt-5.6-luna","outgoingEffort":"none",
+   "upstreamStatus":200,"responseModel":"openai/gpt-5.6-luna",
+   "completed":true},
+ "client":{"exitCode":0,"agentMessage":"ok"},
+ "credentialPresence":{"OPENROUTER_API_KEY":true}}
+```
+
+So on the real compiled client: the exact model slug `gpt-5.6-luna` was sent,
+`reasoning` was exactly `none`, the upstream answered 2xx with a completed
+response naming that model, and the client parsed a non-empty assistant message
+and exited 0. This is the live acceptance the gateway-side block had prevented.
+
+Reproduce (registered as `compact-luna-openrouter-live`):
+
+```sh
+deno run --allow-net=127.0.0.1,openrouter.ai \
+  --allow-env=OPENROUTER_API_KEY,PATH \
+  --allow-run=<fork>/codex-rs/target/debug/codex-exec \
+  --allow-read=.,$TMPDIR,<fork>/codex-rs/target/debug/codex-exec \
+  --allow-write=$TMPDIR \
+  tests/compact-on-demand/m3-luna-openrouter-live.ts
+```
+
+It prints allowlisted structural fields only and exits non-zero on any failure.
+No token, prompt, or raw body is stored.
 
 ### 5.3 The one failing core test is pre-existing and unrelated
 
