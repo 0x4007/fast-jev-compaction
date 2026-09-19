@@ -172,7 +172,7 @@ HTTP 200, `responseModel` `gpt-5.6-luna`, status `completed`; usage
 artifact. No Astra request was made, the `low` fallback was never needed, and
 no token, prompt, or raw body is stored.
 
-### 5.2 Final acceptance status — real-client suite green; gateway Luna route out of balance (resolved in §5.2.3)
+### 5.2 Real-client suite green; the gateway Luna route was out of balance
 
 The real pinned-client suite is now **green and freshly re-verified**: `10
 passed | 0 failed` with the `.ignore` workaround removed and the compiled
@@ -526,9 +526,10 @@ the Deno harnesses are skipped. Verified `npx vitest run` → 3 passed (3) /
 45 passed (45), identical to `main`, with the Deno harnesses still green under
 `deno test`.
 
-### 5.8 Final verification on the frozen head `76919fa`
+### 5.8 Final verification
 
-Every check re-run against the final committed revision, all green:
+Every check re-run against the frozen implementation revision `76919fa`, all
+green (the only later commits are documentation):
 
 | Check | Result |
 | --- | --- |
