@@ -336,6 +336,31 @@ host-timing property of this machine, not a regression introduced here. The
 full-run counts differ only by the new tests: 241 filtered at the base pin vs
 279 executed at the fork tip.
 
+### 5.4 Inference-model compliance audit
+
+The owner's standing rule is: **never use Astra for inference tests; the live
+target is exactly `gpt-5.6-luna` at reasoning `none`** (or `low` only when
+reasoning is enforced or `none` is explicitly rejected).
+
+Every live inference artifact cited by this document was checked against that
+rule:
+
+- The final live PASS (`3f0c25cf…/7db90dff`, 2026-09-19T01:25:25Z) ran
+  `m3-luna-live-smoke.ts`, which hardcodes `LUNA_MODEL = "gpt-5.6-luna"` and
+  performed one `GET /v1/models` gate plus one inference request at effort
+  `none`; the recorded response model was `gpt-5.6-luna`.
+- The real-client suites and all fixtures are non-inference (loopback mocks or
+  a strict boundary that refuses anything but the exact slug). The guard suite
+  uses `gpt-6-astra` only as a **negative fixture** — a literal that must be
+  *rejected* — never as a call target.
+- Earlier `m3-real-luna-*` control targets (`c8f5c117`, `94e0c634`,
+  `1db510dc`, `e2dce887`, 2026-09-18T19:20Z) did run `model="gpt-6-astra"`.
+  They predate the owner's 2026-09-18T23:33:57Z restriction, and no document or
+  test in this branch cites them.
+
+The owner separately confirmed on 2026-09-19 that the whole GPT family was
+unavailable, which is why the M3 live re-check could not produce a fresh PASS.
+
 ## 6. Known rough edges and limits
 
 - **Fallback is common and expected.** A request with no anchors or too many
