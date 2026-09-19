@@ -156,7 +156,7 @@ fork `5c7f93fa32dbd88977e514a8ac87338b0aedda131f6a82fd4b4f058e120827cc`.
 | Real pinned-client mock suite, FINAL GREEN (no `.ignore` workaround, resume fix compiled) | `3f0c25cf…/b2966a82-498d-455f-9758-5532d574a5a4` (`compact-real-client`) | `ok \| 10 passed \| 0 failed`, exit 0, at parent revision `a2ddaf4`, fork binary `566761e77d` |
 | Real pinned-client mock suite, fresh on committed canonical state | `3f0c25cf…/2f8e4a59-6b6d-4f0c-a05d-f55fa04db551` (`compact-real-client`) | `ok \| 10 passed \| 0 failed`, exit 0, at parent revision `2bf5e68` (pin advanced) |
 | Fork selector suite, fresh | `5c7f93fa…` + local `cargo test --locked -p codex-core --lib working_set` | 33 passed, 0 failed |
-| Fork core lib (full), fresh | local `cargo test --locked -p codex-core --lib` | 279 passed, 1 failed: unchanged unrelated PTY timing test `exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now` (`second_min=1900 first_max=300`) |
+| Fork core lib (full), fresh | `5c7f93fa…/f6a3edff-1cdd-486d-8344-635d8ccc864b` (`compact-core-lib-final`) | 279 passed, 1 failed: pre-existing unrelated PTY timing test `exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now`. See §5.3 |
 | Lunar boundary + typecheck, fresh | `3f0c25cf…/7c6ff903-90aa-4285-a6a4-847a1304d8fe`, `…/c14f2d8a-dab7-4689-85b7-c44fbb32ef26`, `…/a0ae40af-81df-4a09-a384-5d757e951690` | 26 passed / exit 0; wire doubles exit 0; `deno check` exit 0 |
 | Luna-only live smoke, fresh final attempt | `3f0c25cf…/e0c27beb-272b-402a-85b2-e4212cef8764` (`compact-luna-live`) | **FAIL (external)** — metadata gate passed, inference returned upstream HTTP 403 `local:insufficient_quota`. See §5.2 |
 
@@ -218,6 +218,24 @@ final binary has **no** live inference PASS of its own: the only attempt,
 `e0c27beb`, was refused upstream by the exhausted wallet. A fresh live PASS on
 the final binary requires the upstream wallet to be topped up; it is an owner
 action, not a code change.
+
+### 5.3 The one failing core test is pre-existing and unrelated
+
+`exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now`
+fails in the full core lib run. It is not part of this feature:
+
+- The test file is **byte-identical** to the base pin: `sha256
+  4c4fe4ff32779723b2dae3f06d8a375218d601777d8f0a7c90246f8a5363120e` at both
+  `5c583fe89b` and the fork tip.
+- This change set touches no file under `exec_command/` or `unified_exec/`.
+- It fails **deterministically**, not intermittently: four consecutive isolated
+  runs each reported `0 passed; 1 failed` after exactly 10.02 s, and the
+  assertion observed differs between runs (`second_min=1900 first_max=300`,
+  then `second.original_token_count.is_some()`), i.e. it is a wall-clock
+  -sensitive PTY timing test asserting on a 100 ms tick counter.
+
+All `working_set` tests, the resume regressions in `rollout::tests`, and the
+real-client suite pass; only this unchanged timing test fails.
 
 ## 6. Known rough edges and limits
 
