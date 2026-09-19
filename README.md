@@ -182,15 +182,19 @@ for the architecture record.
 
 ## Compact-on-demand experiment (M0)
 
-`vendor/codex` is a git submodule pinning the Codex client source under study
-(`5c583fe89bbd3ab4dc9a05768299f94e52fe8452`). The per-request working-set
-feature is implemented in an experimental fork worktree, not in this checkout:
+`vendor/codex` is a git submodule pinning the Codex client source under study.
+It now points at `566761e77dbd44b6fd8fdb0be5c5a8e2b5306d04`, the implemented
+per-request working-set client on branch
+`codex/completion-handoff-2026-09-18-m01-client-a788f68d68d` in the
+[`0x4007/codex`](https://github.com/0x4007/codex) fork. The parent repository
+owns the pinned-client harness, tests, and docs:
 [`docs/compact-on-demand/IMPLEMENTATION.md`](docs/compact-on-demand/IMPLEMENTATION.md)
 records the actual scope, runtime seams, harness, recorded evidence, and limits,
 while [`docs/compact-on-demand/`](docs/compact-on-demand/M0-spec.md) keeps the
 historical milestone specs (M1 per-request selection, M2 mock Responses tests,
-M3 bounded real-Luna smoke). Nothing here changes the shipping `codex/` proxy,
-which keeps its current behaviour.
+M3 bounded real-Luna smoke). The real pinned-client suite is green; the live
+Luna re-check is externally blocked on provider balance. Nothing here changes
+the shipping `codex/` proxy, which keeps its current behaviour.
 
 ## Development
 

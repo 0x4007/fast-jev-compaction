@@ -119,6 +119,16 @@ selection is actually applied at the per-user-request boundary, and the recorded
 seams in `docs/compact-on-demand/IMPLEMENTATION.md` are the description of
 record. The older M0–M3 documents are kept as history with status pointers.
 
+**Delivery status (2026-09-19).** The fork tip
+`566761e77dbd44b6fd8fdb0be5c5a8e2b5306d04` is pushed to `origin`, and the
+`vendor/codex` gitlink has been advanced to it. The parent branch
+`codex/compact-on-demand-implementation` (`2bf5e68`) is pushed to `origin`. The
+real pinned-client suite is green (10/10) with no test-only workaround; the
+M3 live Luna inference re-check is externally blocked because the paid provider
+that serves `gpt-5.6-luna` reports an exhausted wallet (HTTP 403
+`local:insufficient_quota`), while `deepseek-flash` on the same endpoint returns
+HTTP 200. That is an owner top-up action, not a code defect.
+
 No product environment variable, secret, CLI flag, or config knob is added; the
 installed CLI, the shipping `codex/` proxy, and host configuration are
 unchanged.
