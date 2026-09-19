@@ -64,6 +64,13 @@ export interface Adapter {
   stop(): Promise<void>;
 }
 
+/**
+ * Hard bound for the whole run. The adapter must never be able to hang an
+ * acceptance check: a stalled upstream would otherwise leave `stop()` waiting on
+ * an in-flight connection and the process would never exit.
+ */
+const RUN_DEADLINE_MS = 180_000;
+
 export async function startAdapter(): Promise<Adapter> {
   const records: Adapter["records"] = [];
   const server = Deno.serve(
@@ -100,6 +107,10 @@ export async function startAdapter(): Promise<Adapter> {
           headers,
           body,
           redirect: "manual",
+          signal: AbortSignal.any([
+            aborter.signal,
+            AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          ]),
         });
         return new Response(res.body, { status: res.status, headers: res.headers });
       } catch (error) {
@@ -111,7 +122,21 @@ export async function startAdapter(): Promise<Adapter> {
     },
   );
   const origin = `http://127.0.0.1:${server.addr.port}`;
-  return { origin, records, stop: () => server.shutdown() };
+  const aborter = new AbortController();
+  // `server.shutdown()` waits for in-flight connections; on a stalled upstream
+  // that could block forever, so abort first and ignore shutdown errors.
+  const stop = async (): Promise<void> => {
+    aborter.abort();
+    try {
+      await Promise.race([
+        server.shutdown(),
+        new Promise((resolve) => setTimeout(resolve, 5_000)),
+      ]);
+    } catch {
+      // Shutdown is best-effort; the process must still exit.
+    }
+  };
+  return { origin, records, stop, signal: aborter.signal } as Adapter & { signal: AbortSignal };
 }
 
 export interface RunOptions {
@@ -229,7 +254,13 @@ if (import.meta.main) {
     console.log(JSON.stringify({ status: "BLOCKED", reason: "missing-credential", variable: CREDENTIAL_ENV }));
     Deno.exit(2);
   }
+  // A hang is a FAIL, never an unbounded wait.
+  const deadline = setTimeout(() => {
+    console.log(JSON.stringify({ status: "FAIL", reason: "run-deadline-exceeded", windowMs: RUN_DEADLINE_MS }));
+    Deno.exit(1);
+  }, RUN_DEADLINE_MS);
   const outcome = await runLiveAcceptance({ token, binaryPath: forkBinaryPath() });
+  clearTimeout(deadline);
   console.log(JSON.stringify(outcome));
   Deno.exit(outcome.status === "PASS" ? 0 : 1);
 }

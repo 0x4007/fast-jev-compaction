@@ -322,6 +322,11 @@ so `model_family` still selects the `gpt-5` family and emits the reasoning
 parameter. Retries are 0, the request is bounded, and the child runs with a fresh
 temp `CODEX_HOME`/cwd and only the existing credential.
 
+Re-verified on the final frozen revision `c836ba0`
+(`3f0c25cf…/d7e33a6d-fd55-4d38-88cc-6f202686ada5`, exit 0, 2.5 s), and the
+harness bounds the whole run with a deadline so a stalled upstream is a FAIL
+rather than an unbounded wait.
+
 Recorded receipt
 `3f0c25cf…/8e6bf21f-590f-40d2-95de-e5d59c27b762`
 (`compact-luna-openrouter-live`, revision `ff767c9`, exit 0):
