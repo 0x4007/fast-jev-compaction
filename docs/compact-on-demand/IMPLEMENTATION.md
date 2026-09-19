@@ -452,6 +452,32 @@ rule:
 The owner separately confirmed on 2026-09-19 that the whole GPT family was
 unavailable, which is why the M3 live re-check could not produce a fresh PASS.
 
+### 5.5 Completion audit against the corrected goal
+
+| Requirement | Evidence | Status |
+| --- | --- | --- |
+| Reconcile and reuse the canonical implementation state | Parent lane `codex/compact-on-demand-implementation` and fork lane reused as recorded in D9; no renamed or recreated lane | met |
+| Non-destructive per-user-request selector in the pinned client | `core/src/working_set.rs` + freeze at the request boundary in `core/src/codex.rs`; `freeze` is called once per user request | met |
+| Append-only canonical history | Sidecar `canonical.log_len` grows 2 → 4; core test asserts canonical history is unchanged while the wire shrinks | met |
+| Active tool-chain pinning | `FrozenSelection::derived_input` appends items past the frozen prefix verbatim; core test asserts the follow-up carries exactly one dispatch output | met |
+| Deterministic retrieval | Menu-free anchor/coverage closure; identical inputs produce identical digests (unit test) | met |
+| Cost/cache-aware selection | Cost ranks only coverage-valid candidates; smaller input wins only within the 1% tolerance; epoch cache-write accounting tested | met |
+| Safe fallback | `retrieval_insufficient`, `pricing_unknown`, `pricing_stale`, `cache_ineligible`, `canonical_prefix_changed`, `closure_violation` all send canonical and record why; observed live as `pricing_unknown` / `retrieval_insufficient` | met |
+| No historical tool replay | Core test asserts `call_hist` is not re-dispatched; real-client `M2-RC-T04` asserts the recorded call is context only | met |
+| Focused tests | 33 `working_set` unit tests pass; `rollout::tests` 6/6 pass; `reasoning_effort_none_is_explicit_and_never_minimal` passes | met |
+| Real pinned-client loopback mock server | `compact-real-client` fresh run on committed state: 10 passed, 0 failed | met |
+| Live Luna `none` only, `low` only if required | `compact-luna-openrouter-live` PASS at exact `gpt-5.6-luna`, effort `none`; no `low` attempt, no other model used for inference | met |
+| Truthful evidence and limitations | §5.2.1–§5.3.1 record the gateway block, the alternative route, the compliance audit, and the resume/usage limitation | met |
+| Commit and push the implementation branch | Fork `566761e77d` and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
+| Preserve unrelated work | All user checkouts clean; shipping `codex/` proxy, `src/`, `hooks/`, and the installed CLI unchanged (0 files) | met |
+| Leave shipping proxy and host configuration unchanged | No product env var/flag/secret/knob added; installed CLI mtime unchanged | met |
+| Never use Astra for inference | §5.4 audit; the only post-restriction live runs used `gpt-5.6-luna` and, for the funded-path check, `deepseek-flash`/`deepseek-v4-pro` | met |
+
+**Deliberately not claimed.** No 1M-token workload, no long-context accuracy
+benchmark, no dollar saving, no production readiness, no installed-client
+deployment, and no merge to `main`. The one core-lib test failure is pre-existing
+and proven so at the base pin (§5.3).
+
 ## 6. Known rough edges and limits
 
 - **Fallback is common and expected.** A request with no anchors or too many
