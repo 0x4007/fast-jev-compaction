@@ -526,6 +526,23 @@ the Deno harnesses are skipped. Verified `npx vitest run` → 3 passed (3) /
 45 passed (45), identical to `main`, with the Deno harnesses still green under
 `deno test`.
 
+### 5.8 Final verification on the frozen head `76919fa`
+
+Every check re-run against the final committed revision, all green:
+
+| Check | Result |
+| --- | --- |
+| `npx vitest run` (repository `npm test`) | 3 files passed, 45 tests passed — identical to `main` |
+| `deno check tests/compact-on-demand/*.ts` | exit 0 |
+| `compact-real-client` (fresh) | `3f0c25cf…/209efd17-fdf8-4a28-abfa-42ae08ff0a1f`, exit 0 |
+| `compact-luna-openrouter-live` (fresh) | `3f0c25cf…/af868727-edaa-4363-bb99-3af8ae515fae`, exit 0 |
+| `cargo test -p codex-core --lib working_set` | 33 passed, 0 failed |
+| `cargo test -p codex-core --lib rollout::tests` | 6 passed, 0 failed |
+| `cargo test -p codex-protocol reasoning_effort_none_is_explicit_and_never_minimal` | 1 passed, 0 failed |
+
+Only `exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now`
+still fails, and §5.3 proves it fails identically at the pristine base pin.
+
 ## 6. Known rough edges and limits
 
 - **Fallback is common and expected.** A request with no anchors or too many
