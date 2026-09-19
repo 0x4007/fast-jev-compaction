@@ -237,6 +237,22 @@ fails in the full core lib run. It is not part of this feature:
 All `working_set` tests, the resume regressions in `rollout::tests`, and the
 real-client suite pass; only this unchanged timing test fails.
 
+**Baseline proof that it is pre-existing.** The same test was run at the
+pristine base pin, before any of this work:
+
+- `5c7f93fa…/4ffd06bd-82be-4c3b-a5ee-c13b758f9e0c`
+  (`compact-core-baseline-pty`, revision `5c583fe89b`, the untouched upstream
+  base) → `test result: FAILED. 0 passed; 1 failed`, exit 101, panicking at
+  `core/src/exec_command/session_manager.rs:464` with
+  `second_min=2300 first_max=800`.
+- The identical command at the fork tip (`566761e77d`) → `test result: FAILED.
+  0 passed; 1 failed` (see §5.3 above), with the same 10.02-10.03 s wall time.
+
+It fails at the base pin exactly as it fails at the fork tip, so it is a
+host-timing property of this machine, not a regression introduced here. The
+full-run counts differ only by the new tests: 241 filtered at the base pin vs
+279 executed at the fork tip.
+
 ## 6. Known rough edges and limits
 
 - **Fallback is common and expected.** A request with no anchors or too many
