@@ -219,6 +219,47 @@ final binary has **no** live inference PASS of its own: the only attempt,
 the final binary requires the upstream wallet to be topped up; it is an owner
 action, not a code change.
 
+### 5.2.1 Live wire proof of explicit `reasoning.effort = none` (2026-09-19)
+
+The GPT family (including `gpt-5.6-luna`) is unavailable tonight: every
+`gpt-5.6-*`, `gpt-6-*` request returns HTTP 403 `local:insufficient_quota`
+(§5.2), and the owner confirmed the GPT side is down. The live `none` wire path
+was therefore proven in two parts, both against the **compiled fork client**
+(`codex-exec` at `566761e77d`, sha256 `797788a6…`) pointed at a loopback
+recording proxy in front of the real gateway
+(`http://127.0.0.1:7999/v1`), with retries 0 and a fresh temp `CODEX_HOME`/cwd.
+
+1. **Funded model, real live completion.** `deepseek-v4-pro` — present in the
+   gateway catalog and funded — completed with exit 0:
+   `{"id":"0","msg":{"type":"agent_message","message":"ok"}}`, usage 5794 in /
+   2 out. This proves the client's normal request path still works end to end
+   for a live model.
+2. **Reasoning-capable slug, exact wire bytes.** The same client configured with
+   `model="gpt-5.6-luna"` and `model_reasoning_effort="none"` emitted, on the
+   actual outbound request body:
+
+   ```json
+   {"path":"/v1/responses","model":"gpt-5.6-luna",
+    "reasoning":{"effort":"none","summary":"auto"},
+    "inputKinds":["message","message"],"inputLen":2}
+   ```
+
+   The client banner also reported `"reasoning effort":"none"`. The upstream
+   then answered the same 403 quota error as every other GPT request, so this
+   is byte-level wire proof, not a completed inference. `none` is present,
+   exact, and never coerced to `minimal`.
+
+**Negative control (this is why the change matters).** The client compiled from
+the **untouched base pin** `5c583fe89b` was given the identical
+`model_reasoning_effort="none"` and **rejected it before any request**:
+`Failed to deserialize overridden config: unknown variant \`none\`, expected one
+of \`minimal\`, \`low\`, \`medium\`, \`high\``, exit 1. So `none` is a genuine
+new capability of this change, not pre-existing behaviour, and the fork client
+is the only one of the two that can express it.
+
+The wire capture is a derivative artifact, not a committed secret: it contains
+no token, prompt text, or response body.
+
 ### 5.3 The one failing core test is pre-existing and unrelated
 
 `exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now`
