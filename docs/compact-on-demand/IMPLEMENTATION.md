@@ -476,6 +476,7 @@ unavailable, which is why the M3 live re-check could not produce a fresh PASS.
 | Truthful evidence and limitations | §5.2.1–§5.3.1 record the gateway block, the alternative route, the compliance audit, and the resume/usage limitation | met |
 | Commit and push the implementation branch | Fork `566761e77d` and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
 | Preserve unrelated work | All user checkouts clean; shipping `codex/` proxy, `src/`, `hooks/`, and the installed CLI unchanged (0 files) | met |
+| Leave the repository's own `npm test` working | The Deno harnesses are excluded from vitest's default glob via `vitest.config.ts`; `npx vitest run` reports 3 files / 45 tests passing, identical to `main` | met (fixed in `2be1e80`) |
 | Leave shipping proxy and host configuration unchanged | No product env var/flag/secret/knob added; installed CLI mtime unchanged | met |
 | Never use Astra for inference | §5.4 audit; the only post-restriction live runs used `gpt-5.6-luna` and, for the funded-path check, `deepseek-flash`/`deepseek-v4-pro` | met |
 
@@ -505,6 +506,25 @@ recipe, both taken only because the gateway route was refusing the model:
 
 The feature's live acceptance itself remains the exact `gpt-5.6-luna` at
 reasoning `none` (§5.2.3).
+
+### 5.7 Regression found and fixed: the harness broke the repository's own test run
+
+The acceptance harnesses added under `tests/compact-on-demand/` are
+Deno-native (`Deno.test`, `Deno.Command`) and are intended to run under
+`deno test` (§4). The repository's `npm test` is `vitest run` **with no vitest
+config**, and vitest's default include glob is `**/*.test.ts` — so adding
+`m2-wire.test.ts`, `m2-usage-cache.test.ts`, `m2-real-client.test.ts`,
+`m2-working-set-sidecar.test.ts`, and `luna-guard.test.ts` silently pulled them
+into vitest, which failed with `ReferenceError: Deno is not defined`
+(6 failed suites).
+
+This was a genuine regression introduced by the harness, not a pre-existing
+failure: `main` is green (3 files / 45 tests). Fixed in `2be1e80` with a
+`vitest.config.ts` that spreads `configDefaults.exclude` and adds
+`tests/compact-on-demand/**`, so the default exclusions are preserved and only
+the Deno harnesses are skipped. Verified `npx vitest run` → 3 passed (3) /
+45 passed (45), identical to `main`, with the Deno harnesses still green under
+`deno test`.
 
 ## 6. Known rough edges and limits
 
