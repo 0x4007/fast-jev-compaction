@@ -37,9 +37,9 @@ Location: fork worktree
 branch `codex/completion-handoff-2026-09-18-m01-client-a788f68d68d`, base pin
 `5c583fe89bbd3ab4dc9a05768299f94e52fe8452` (the original `vendor/codex` gitlink).
 The implementation is committed and pushed to `origin`. The accepted tip is
-`ef6ae29aa37d35db02399c9756336a270d2108b6` (`fix(core): restore persisted token
-usage on resume so projection can apply`), and the parent `vendor/codex` gitlink
-now points at that exact commit. The change set is `core/src/working_set.rs` (new),
+`a1f65cce2d339a5e4324e237f1b0dab319f1f672` (`fix(core): restore the previous
+working-set epoch from the sidecar on resume`), and the parent `vendor/codex`
+gitlink now points at that exact commit. The change set is `core/src/working_set.rs` (new),
 `core/src/codex.rs`, `core/src/rollout/list.rs`, `core/src/lib.rs`,
 `protocol/src/config_types.rs`, `tui/src/history_cell.rs` (one line),
 `core/Cargo.toml`, and `Cargo.lock`. `rollout/list.rs` is the product fix for
@@ -157,6 +157,7 @@ fork `5c7f93fa32dbd88977e514a8ac87338b0aedda131f6a82fd4b4f058e120827cc`.
 | Real pinned-client mock suite, FINAL GREEN (no `.ignore` workaround, resume fix compiled) | `3f0c25cf…/b2966a82-498d-455f-9758-5532d574a5a4` (`compact-real-client`) | `ok \| 10 passed \| 0 failed`, exit 0, at parent revision `a2ddaf4`, fork binary `566761e77d` |
 | Real pinned-client mock suite, fresh on committed canonical state | `3f0c25cf…/2f8e4a59-6b6d-4f0c-a05d-f55fa04db551` (`compact-real-client`) | `ok \| 10 passed \| 0 failed`, exit 0, at parent revision `2bf5e68` (pin advanced) |
 | Fork selector suite, fresh | local `cargo test --locked -p codex-core --lib working_set` | 34 passed, 0 failed |
+| Fork rollout suite, fresh | local `cargo test --locked -p codex-core --lib rollout::tests` | 6 passed, 0 failed |
 | Fork core lib (full), fresh | `5c7f93fa…/f6a3edff-1cdd-486d-8344-635d8ccc864b` (`compact-core-lib-final`) | 279 passed, 1 failed: pre-existing unrelated PTY timing test `exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now`. See §5.3 |
 | Lunar boundary + typecheck, fresh | `3f0c25cf…/7c6ff903-90aa-4285-a6a4-847a1304d8fe`, `…/c14f2d8a-dab7-4689-85b7-c44fbb32ef26`, `…/a0ae40af-81df-4a09-a384-5d757e951690` | 26 passed / exit 0; wire doubles exit 0; `deno check` exit 0 |
 | Luna-only live smoke, fresh final attempt | `3f0c25cf…/e0c27beb-272b-402a-85b2-e4212cef8764` (`compact-luna-live`) | **FAIL (external)** — metadata gate passed, inference returned upstream HTTP 403 `local:insufficient_quota`. See §5.2 |
@@ -414,27 +415,53 @@ defect the mock suites could not show, because they never assert
   items only — so every `exec` / `exec resume` first request had no usage and
   could never project.
 
-**Fix (`ef6ae29`).** The usage was already being persisted:
+**Fix 1 — restore usage (`ef6ae29a`).** The usage was already being persisted:
 `should_persist_event_msg` keeps `EventMsg::TokenCount`, and the recorder
 reloads it, but the catch-all arm of `reconstruct_history_from_rollout`
-discarded it. The reconstruction now reads the newest `TokenCount` record back
-into `state.token_info` when one is not already set.
+discarded it. Reconstruction now reads the newest `TokenCount` record back into
+`state.token_info`.
 
-**Verified live, across a process boundary**, exact `gpt-5.6-luna`, effort
-`none`, on the frozen `ef6ae29` binary:
+**Fix 2 — restore the previous epoch (`a1f65cce`).** A second instance of the
+same class of bug: `previous_epoch_id` was never repopulated after a process
+boundary, so an already-warm baseline prefix was mispriced as a fresh cache
+write. A throwaway probe on identical fixture inputs measured the flip:
 
-| Turn | applied | confidence | unknown_fields | decision | canonical → wire |
-| --- | --- | --- | --- | --- | --- |
-| 1 | false | low | `["expected_output_tokens"]` | `canonical` (`retrieval_insufficient`) | 2 → 2 |
-| 2 (resume) | **true** | **high** | **[]** | **`projected`** (`lower_expected_cost`) | **4 → 3** |
+| previous_epoch_id | winner | applied | baseline charged as |
+| --- | --- | --- | --- |
+| present | Baseline | false | `epoch_unchanged_cached_prefix` |
+| absent | Candidate | true | `changed_epoch_cache_write` |
 
-Turn 2's recorded cost comparison: candidate `5.045e-05` vs baseline
-`5.595e-05` USD. Both turns answered correctly (the model resolved ALPHA-7 from
-turn 1), so canonical history stayed intact while the wire shrank.
+Resume now reads the newest `turn.epoch_id` (falling back to the newest
+`selection.manifest.epoch.epoch_id`) from the sidecar into
+`state.last_working_set_epoch`.
 
-A regression test (`missing_usage_forces_fallback_and_present_usage_applies`)
-pins both directions: absent usage keeps the honest `pricing_unknown` fallback,
-present usage applies the projection. The selector suite is now 34 passing.
+**Live result after both fixes**, exact `gpt-5.6-luna`, effort `none`, resume
+across a process boundary. Both turns answered correctly, so canonical history
+stayed intact:
+
+| Turn | applied | reason | epoch.changed | candidate / baseline |
+| --- | --- | --- | --- | --- |
+| 1 | false | `retrieval_insufficient` | true (no prior) | 136 / 136 tokens |
+| 2 (resume) | false | **`cache_ineligible`** | true | 4.2e-05 / 5.62e-05 USD |
+
+The epoch restore **worked** — turn 2's candidate is now charged with
+`min_cacheable_prefix_unknown` instead of `changed_epoch_cache_write`, meaning
+it reached the cached-prefix branch it previously could not. That branch then
+stopped on a catalog gap: the production `gpt-5.6-luna` record carries
+`min_cacheable_prefix_tokens: None`, and `cache_charge` refuses to claim cache
+eligibility without it (I10 — no invented values). The synthetic test catalog
+sets `Some(1)`, which is why the unit tests pass while production falls back.
+
+**Third open item, not a bug.** OpenRouter publishes no minimum-cacheable-prefix
+field for this model (verified against the live `/v1/models` payload: only
+`prompt`, `completion`, `input_cache_read`, `input_cache_write`, `web_search`,
+`overrides`). So the selector will keep recording `cache_ineligible` on a warm
+prefix until that value comes from somewhere honest — a provider that documents
+it, or a measured value. It currently **degrades to canonical (correct and
+safe)**, and the wire therefore does not shrink on a warm resumed prefix.
+
+Both fixes are behaviour-preserving when the data is absent: a missing or
+malformed sidecar leaves the conservative default in place.
 
 ### 5.4 Inference-model compliance audit
 
@@ -477,7 +504,7 @@ unavailable, which is why the M3 live re-check could not produce a fresh PASS.
 | Real pinned-client loopback mock server | `compact-real-client` fresh run on committed state: 10 passed, 0 failed | met |
 | Live Luna `none` only, `low` only if required | `compact-luna-openrouter-live` PASS at exact `gpt-5.6-luna`, effort `none`; no `low` attempt, no other model used for inference | met |
 | Truthful evidence and limitations | §5.2.1–§5.3.1 record the gateway block, the alternative route, the compliance audit, and the resume/usage limitation | met |
-| Commit and push the implementation branch | Fork `ef6ae29aa3` (usage-restore fix) and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
+| Commit and push the implementation branch | Fork `a1f65cce2d` (usage + epoch restore) and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
 | Preserve unrelated work | All user checkouts clean; shipping `codex/` proxy, `src/`, `hooks/`, and the installed CLI unchanged (0 files) | met |
 | Leave the repository's own `npm test` working | The Deno harnesses are excluded from vitest's default glob via `vitest.config.ts`; `npx vitest run` reports 3 files / 45 tests passing, identical to `main` | met (fixed in `2be1e80`) |
 | Leave shipping proxy and host configuration unchanged | No product env var/flag/secret/knob added; installed CLI mtime unchanged | met |
@@ -584,7 +611,7 @@ still fails, and §5.3 proves it fails identically at the pristine base pin.
 - **Process-local indices.** `request_index`/`turn_index` restart across
   `exec resume` processes; consumers must not treat them as session-global ids.
 - **Committed and pushed state.** The fork implementation is committed and
-  pushed as `ef6ae29aa37d35db02399c9756336a270d2108b6` on
+  pushed as `a1f65cce2d339a5e4324e237f1b0dab319f1f672` on
   `codex/completion-handoff-2026-09-18-m01-client-a788f68d68d`, and the parent
   `vendor/codex` gitlink has been advanced to that exact reachable commit. The installed CLI and the shipping
   `codex/` proxy remain unchanged.
