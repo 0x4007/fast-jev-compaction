@@ -36,9 +36,10 @@ Location: fork worktree
 `/Users/nv/repos/0x4007/codex/.codex-worktrees/completion-handoff-2026-09-18-m01-client-a788f68d68d`,
 branch `codex/completion-handoff-2026-09-18-m01-client-a788f68d68d`, base pin
 `5c583fe89bbd3ab4dc9a05768299f94e52fe8452` (the original `vendor/codex` gitlink).
-The implementation is committed as `566761e77dbd44b6fd8fdb0be5c5a8e2b5306d04`
-and pushed to `origin`; the parent `vendor/codex` gitlink now points at that
-exact commit. The change set is `core/src/working_set.rs` (new),
+The implementation is committed and pushed to `origin`. The accepted tip is
+`ef6ae29aa37d35db02399c9756336a270d2108b6` (`fix(core): restore persisted token
+usage on resume so projection can apply`), and the parent `vendor/codex` gitlink
+now points at that exact commit. The change set is `core/src/working_set.rs` (new),
 `core/src/codex.rs`, `core/src/rollout/list.rs`, `core/src/lib.rs`,
 `protocol/src/config_types.rs`, `tui/src/history_cell.rs` (one line),
 `core/Cargo.toml`, and `Cargo.lock`. `rollout/list.rs` is the product fix for
@@ -155,7 +156,7 @@ fork `5c7f93fa32dbd88977e514a8ac87338b0aedda131f6a82fd4b4f058e120827cc`.
 | Real pinned-client mock suite, second run | `3f0c25cf…/44a24778-2282-41b7-a074-1d9d4fc9fef6` (`compact-real-client`) | 9 passed, 1 failed (WS01 `request_index` uniqueness; helper since corrected) — **historical**: this run still used the harness-only `.ignore` workaround, so it did not exercise the product resume lookup |
 | Real pinned-client mock suite, FINAL GREEN (no `.ignore` workaround, resume fix compiled) | `3f0c25cf…/b2966a82-498d-455f-9758-5532d574a5a4` (`compact-real-client`) | `ok \| 10 passed \| 0 failed`, exit 0, at parent revision `a2ddaf4`, fork binary `566761e77d` |
 | Real pinned-client mock suite, fresh on committed canonical state | `3f0c25cf…/2f8e4a59-6b6d-4f0c-a05d-f55fa04db551` (`compact-real-client`) | `ok \| 10 passed \| 0 failed`, exit 0, at parent revision `2bf5e68` (pin advanced) |
-| Fork selector suite, fresh | `5c7f93fa…` + local `cargo test --locked -p codex-core --lib working_set` | 33 passed, 0 failed |
+| Fork selector suite, fresh | local `cargo test --locked -p codex-core --lib working_set` | 34 passed, 0 failed |
 | Fork core lib (full), fresh | `5c7f93fa…/f6a3edff-1cdd-486d-8344-635d8ccc864b` (`compact-core-lib-final`) | 279 passed, 1 failed: pre-existing unrelated PTY timing test `exec_command::session_manager::tests::session_manager_streams_and_truncates_from_now`. See §5.3 |
 | Lunar boundary + typecheck, fresh | `3f0c25cf…/7c6ff903-90aa-4285-a6a4-847a1304d8fe`, `…/c14f2d8a-dab7-4689-85b7-c44fbb32ef26`, `…/a0ae40af-81df-4a09-a384-5d757e951690` | 26 passed / exit 0; wire doubles exit 0; `deno check` exit 0 |
 | Luna-only live smoke, fresh final attempt | `3f0c25cf…/e0c27beb-272b-402a-85b2-e4212cef8764` (`compact-luna-live`) | **FAIL (external)** — metadata gate passed, inference returned upstream HTTP 403 `local:insufficient_quota`. See §5.2 |
@@ -395,43 +396,45 @@ host-timing property of this machine, not a regression introduced here. The
 full-run counts differ only by the new tests: 241 filtered at the base pin vs
 279 executed at the fork tip.
 
-### 5.3.1 Live finding: projection needs prior usage evidence in the same process
+### 5.3.1 Live finding: projection never applied under `exec` — FIXED
 
-The live two-turn run in §5.2.2 is the first end-to-end exercise of the selector
-against a model that actually has a recorded catalog (`gpt-5.6-luna`). It
-exposed a limitation that the mock suites cannot show, because they never assert
+The live two-turn run in §5.2.2 was the first end-to-end exercise of the
+selector against a model with a recorded catalog (`gpt-5.6-luna`). It exposed a
+defect the mock suites could not show, because they never assert
 `applied === true`:
 
-- **Turn 2 selected correctly but still fell back.** The manifest shows a real
-  projection computed — `canonical.log_len 4`, `projection.len 3`,
-  `omitted 1`, `retrieval [{rule: anchor, anchor_count: 1}]`, catalog
-  `openrouter-2026-09-19-5ecb4fe3`, currency `USD`, unit `per_1m_tokens` — yet
-  `applied false` with `selection_reason pricing_unknown`.
+- Turn 2 computed a real projection — `canonical.log_len 4`, `projection.len 3`,
+  `omitted 1`, retrieval by anchor, catalog `openrouter-2026-09-19-5ecb4fe3` —
+  yet recorded `applied false`, `selection_reason pricing_unknown`.
+- The only entry in `cost.unknown_fields` was `expected_output_tokens`.
+  `cost_basis` returns `None` (and records that field) when `inputs.usage` is
+  `None`; a `None` amount forces `confidence = low`, which forces
+  `applied = false`. Usage came from `Session::last_token_usage()`, which reads
+  in-memory state, and `reconstruct_history_from_rollout` rebuilt conversation
+  items only — so every `exec` / `exec resume` first request had no usage and
+  could never project.
 
-**Mechanism.** The only entry in `cost.unknown_fields` is
-`expected_output_tokens`. `cost_basis` returns `None` (and records that field)
-when `inputs.usage` is `None`, and a `None` amount forces
-`confidence = low`, which forces `applied = false` and the canonical send. The
-usage input is `Session::last_token_usage()`, which reads in-memory
-`state.token_info`; `reconstruct_history_from_rollout` rebuilds conversation
-items only and never restores token usage across a process boundary.
+**Fix (`ef6ae29`).** The usage was already being persisted:
+`should_persist_event_msg` keeps `EventMsg::TokenCount`, and the recorder
+reloads it, but the catch-all arm of `reconstruct_history_from_rollout`
+discarded it. The reconstruction now reads the newest `TokenCount` record back
+into `state.token_info` when one is not already set.
 
-**Consequence.** With `exec`, every invocation is one process, and
-`exec resume` starts a new one, so `last_token_usage()` is `None` on the first
-user request of every `exec`/`exec resume` turn and projection can never apply
-there — the selector always records the honest `pricing_unknown` fallback.
-Projection *does* apply when two user requests share one process, which is what
-`working_set_projection_reduces_wire_and_keeps_canonical_history` proves
-in-process (`applied true`, `turn.decision projected`), and what a long-lived
-interactive/TUI session would exercise.
+**Verified live, across a process boundary**, exact `gpt-5.6-luna`, effort
+`none`, on the frozen `ef6ae29` binary:
 
-This is a conservative-behaviour limitation, not a defect: refusing to estimate
-output cost without usage evidence is exactly the documented I10/I12 rule, and
-the fallback is recorded rather than hidden. It does mean the feature's wire
-reduction is currently only reachable inside a single long-lived process, and
-that closing the gap would require either restoring usage evidence on resume or
-an explicitly recorded default output estimate. Neither is implemented here;
-both are out of scope for this slice and are recorded rather than papered over.
+| Turn | applied | confidence | unknown_fields | decision | canonical → wire |
+| --- | --- | --- | --- | --- | --- |
+| 1 | false | low | `["expected_output_tokens"]` | `canonical` (`retrieval_insufficient`) | 2 → 2 |
+| 2 (resume) | **true** | **high** | **[]** | **`projected`** (`lower_expected_cost`) | **4 → 3** |
+
+Turn 2's recorded cost comparison: candidate `5.045e-05` vs baseline
+`5.595e-05` USD. Both turns answered correctly (the model resolved ALPHA-7 from
+turn 1), so canonical history stayed intact while the wire shrank.
+
+A regression test (`missing_usage_forces_fallback_and_present_usage_applies`)
+pins both directions: absent usage keeps the honest `pricing_unknown` fallback,
+present usage applies the projection. The selector suite is now 34 passing.
 
 ### 5.4 Inference-model compliance audit
 
@@ -474,7 +477,7 @@ unavailable, which is why the M3 live re-check could not produce a fresh PASS.
 | Real pinned-client loopback mock server | `compact-real-client` fresh run on committed state: 10 passed, 0 failed | met |
 | Live Luna `none` only, `low` only if required | `compact-luna-openrouter-live` PASS at exact `gpt-5.6-luna`, effort `none`; no `low` attempt, no other model used for inference | met |
 | Truthful evidence and limitations | §5.2.1–§5.3.1 record the gateway block, the alternative route, the compliance audit, and the resume/usage limitation | met |
-| Commit and push the implementation branch | Fork `566761e77d` and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
+| Commit and push the implementation branch | Fork `ef6ae29aa3` (usage-restore fix) and parent `codex/compact-on-demand-implementation` both pushed; `ls-remote` matches local HEAD | met |
 | Preserve unrelated work | All user checkouts clean; shipping `codex/` proxy, `src/`, `hooks/`, and the installed CLI unchanged (0 files) | met |
 | Leave the repository's own `npm test` working | The Deno harnesses are excluded from vitest's default glob via `vitest.config.ts`; `npx vitest run` reports 3 files / 45 tests passing, identical to `main` | met (fixed in `2be1e80`) |
 | Leave shipping proxy and host configuration unchanged | No product env var/flag/secret/knob added; installed CLI mtime unchanged | met |
@@ -581,11 +584,9 @@ still fails, and §5.3 proves it fails identically at the pristine base pin.
 - **Process-local indices.** `request_index`/`turn_index` restart across
   `exec resume` processes; consumers must not treat them as session-global ids.
 - **Committed and pushed state.** The fork implementation is committed and
-  pushed as `566761e77dbd44b6fd8fdb0be5c5a8e2b5306d04` on
+  pushed as `ef6ae29aa37d35db02399c9756336a270d2108b6` on
   `codex/completion-handoff-2026-09-18-m01-client-a788f68d68d`, and the parent
-  `vendor/codex` gitlink has been advanced to that exact reachable commit and
-  pushed as `2bf5e688f80dbd72e1cc27d6788092514e21bf39` on
-  `codex/compact-on-demand-implementation`. The installed CLI and the shipping
+  `vendor/codex` gitlink has been advanced to that exact reachable commit. The installed CLI and the shipping
   `codex/` proxy remain unchanged.
 - **The live Luna wallet may be exhausted.** `gpt-5.6-luna` is served through a
   paid tier whose wallet can run dry independently of this code; when it does,
