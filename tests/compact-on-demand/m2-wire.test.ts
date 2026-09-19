@@ -196,21 +196,23 @@ Deno.test("M2-T03 function call + continuation: call_id matched, dispatch count 
 });
 
 Deno.test({
-  name: "M2-T04 [deferred: M1 projection not implemented] shadow projection manifest and digest",
+  name:
+    "M2-T04 [deferred: TS double] shadow projection manifest and digest — real client sidecar asserted by m2-working-set-sidecar.test.ts",
   ignore: true,
   fn() {
     throw new Error(
-      "M2-T04 is deferred: the M1 working-set projection does not exist in this worktree; claiming it would be false.",
+      "M2-T04 stays deferred for the TS double: the double has no projection. The real pinned client's selection manifest and digest are asserted against its sidecar by m2-working-set-sidecar.test.ts (M2-RC-WS01..WS03).",
     );
   },
 });
 
 Deno.test({
-  name: "M2-T05 [deferred: M1 projection not implemented] selection fallback to full canonical history",
+  name:
+    "M2-T05 [deferred: TS double] selection fallback to full canonical history — real client sidecar asserted by m2-working-set-sidecar.test.ts",
   ignore: true,
   fn() {
     throw new Error(
-      "M2-T05 is deferred: the M1 selection/fallback path does not exist in this worktree; Jev is never called in M2.",
+      "M2-T05 stays deferred for the TS double. The real pinned client's fallback fields and canonical preservation are asserted against its sidecar by m2-working-set-sidecar.test.ts (M2-RC-WS01..WS03); Jev is never called in M2.",
     );
   },
 });

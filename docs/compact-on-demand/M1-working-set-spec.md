@@ -1,5 +1,11 @@
 # M1 — Working-set shadow path (specification)
 
+Implementation status (2026-09-18): this file is the historical shadow-first
+specification. The delivered per-request selector, its actual manifest fields,
+seams, evidence, and limits are in
+[`IMPLEMENTATION.md`](IMPLEMENTATION.md); the recorded code/evidence supersede
+this text where they differ.
+
 Status: `[PROPOSED]` design; nothing in M0 implements it. Date: 2026-09-18.
 Revision: 2026-09-18 adds cost-aware selection (C2, C13, §4) per M0 §4.
 Source pin: `5c583fe89bbd3ab4dc9a05768299f94e52fe8452` (`vendor/codex`) — all

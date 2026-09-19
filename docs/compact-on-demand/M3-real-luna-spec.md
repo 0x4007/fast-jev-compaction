@@ -1,5 +1,9 @@
 # M3 — Real-model smoke test (specification)
 
+Implementation status (2026-09-18): this file is the historical specification.
+The implemented guarded live smoke, its exact allowlist, and the recorded
+Luna-only evidence are in [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
+
 Filename note: the historical name `M3-real-luna-spec.md` is retained for
 continuity and is accurate: "luna" is the objective's target slug `gpt-5.6-luna`,
 not an artifact and not a codename. The name is not renamed as part of this

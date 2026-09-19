@@ -8,6 +8,8 @@
 
 import {
   FAILED_SSE,
+  HARNESS_UNKNOWN_TOOL_CALL_SSE,
+  HARNESS_UNKNOWN_TOOL_CONTINUATION_SSE,
   MINIMAL_SUCCESS_SSE,
   RESPONSES_PATH,
   TEST_SENTINEL,
@@ -39,7 +41,11 @@ export type Scenario =
   | "usage-absent"
   | "usage-details-omitted"
   | "usage-missing-total"
-  | "epoch-sequence";
+  | "epoch-sequence"
+  /* Added for the real pinned-client harness (M2-RC); additive, no row above changes. */
+  | "tool-call-unknown"
+  | "tool-call-unknown-resume"
+  | "success-then-http-500";
 
 export interface RecordedRequest {
   method: string;
@@ -158,13 +164,30 @@ function scenarioResponse(scenario: Scenario, requestIndex: number): Response {
     case "epoch-sequence":
       // Turn 1: changed cache epoch, no cache fields reported. Turn 2: same epoch with cached tokens.
       return sseResponse(requestIndex === 1 ? MINIMAL_SUCCESS_SSE : USAGE_FULL_SSE);
+    /* Real pinned-client harness (M2-RC). */
+    case "tool-call-unknown":
+      return sseResponse(
+        requestIndex === 1 ? HARNESS_UNKNOWN_TOOL_CALL_SSE : HARNESS_UNKNOWN_TOOL_CONTINUATION_SSE,
+      );
+    case "tool-call-unknown-resume":
+      if (requestIndex === 1) return sseResponse(HARNESS_UNKNOWN_TOOL_CALL_SSE);
+      if (requestIndex === 2) return sseResponse(HARNESS_UNKNOWN_TOOL_CONTINUATION_SSE);
+      return sseResponse(MINIMAL_SUCCESS_SSE);
+    case "success-then-http-500":
+      if (requestIndex === 1) return sseResponse(MINIMAL_SUCCESS_SSE);
+      return jsonResponse(500, {
+        error: { message: "synthetic internal error", type: "server_error" },
+      });
   }
 }
 
 /** Counts `function_call` items actually emitted in a scenario body. */
 function countEmittedFunctionCalls(scenario: Scenario, requestIndex: number): number {
-  if (scenario !== "tool-call") return 0;
-  return requestIndex === 1 ? 1 : 0;
+  if (scenario === "tool-call") return requestIndex === 1 ? 1 : 0;
+  if (scenario === "tool-call-unknown" || scenario === "tool-call-unknown-resume") {
+    return requestIndex === 1 ? 1 : 0;
+  }
+  return 0;
 }
 
 export async function startMockResponsesServer(scenario: Scenario): Promise<MockResponsesServer> {

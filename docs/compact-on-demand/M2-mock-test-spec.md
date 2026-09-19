@@ -1,5 +1,9 @@
 # M2 — Mock Responses server and tests (specification)
 
+Implementation status (2026-09-18): this file is the historical specification.
+The actual test surfaces, the pinned-client harness, exact commands, and
+recorded pass/fail evidence are in [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
+
 Status: `[PROPOSED]`; no test files are created in M0. Date: 2026-09-18.
 Revision: 2026-09-18 adds usage/cache-accounting assertions (M2-T17…T21, B7–B10)
 per M0 §4.7.

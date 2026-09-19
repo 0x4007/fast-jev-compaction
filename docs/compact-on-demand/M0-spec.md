@@ -1,5 +1,11 @@
 # M0 — Specs, source pin, and cost policy
 
+Implementation status (2026-09-18): this file is the historical M0
+specification. What was actually built, its runtime seams, the recorded
+evidence, and the known limits are in
+[`IMPLEMENTATION.md`](IMPLEMENTATION.md); where this spec and the recorded
+code/evidence disagree, the latter are authoritative.
+
 Module: `m00-spec-submodule`. Date: 2026-09-18. Status: M0 delivered; M1–M3 are
 specified here but not implemented. Revision: 2026-09-18 adds the normative
 model-aware cost policy (§4) and invariants I10–I15.

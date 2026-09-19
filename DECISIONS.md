@@ -101,3 +101,25 @@ every API call even though the UI page loads. The passthrough therefore rewrites
 request origin; absent and foreign origins are forwarded untouched and still
 rejected upstream. Cross-site requests stay rejected.
 
+## D9 — Compact-on-demand lives in an independent experimental client fork
+
+The per-user-request working-set feature is developed in a separate fork worktree
+of the Codex client (branch
+`codex/completion-handoff-2026-09-18-m01-client-a788f68d68d`, base
+`5c583fe89bbd3ab4dc9a05768299f94e52fe8452`), not in the shipping proxy, the
+installed CLI, or an in-place `vendor/codex` edit. The parent repository owns the
+pinned-client harness, tests, and docs; the `vendor/codex` gitlink advances only
+after the fork tip is accepted and pushed.
+
+The **implemented** selection manifest (schema version 2, kind
+`compact-on-demand/selection-manifest`, append-only
+`<rollout>.working-set.jsonl` sidecar, one selection per user request and one
+turn record per upstream request) supersedes the M1 shadow-path manifest sketch:
+selection is actually applied at the per-user-request boundary, and the recorded
+seams in `docs/compact-on-demand/IMPLEMENTATION.md` are the description of
+record. The older M0–M3 documents are kept as history with status pointers.
+
+No product environment variable, secret, CLI flag, or config knob is added; the
+installed CLI, the shipping `codex/` proxy, and host configuration are
+unchanged.
+

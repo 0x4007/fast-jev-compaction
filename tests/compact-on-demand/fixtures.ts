@@ -164,6 +164,80 @@ export const TOOL_CONTINUATION_SSE = [
   }),
 ].join("");
 
+/* ------------------------------------------------------------------ */
+/* Real pinned-client harness fixtures (M2-RC)                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Unknown-tool call fixture for the real compiled client.
+ *
+ * The pinned client dispatches every `function_call` item unconditionally
+ * (`core/src/codex.rs:2206` → `handle_function_call`) and answers a name it
+ * does not implement with a deterministic local output
+ * (`core/src/codex.rs:2571`: `format!("unsupported call: {name}")`). Using an
+ * unknown name therefore proves call/result continuation on the wire without
+ * executing any sandbox command.
+ */
+export const HARNESS_TOOL_NAME = "m2_harness_unknown_tool";
+export const HARNESS_CALL_ID = "call_m2_harness_unknown_1";
+export const HARNESS_TOOL_ARGUMENTS = '{"command":"m2-harness-synthetic"}';
+export const HARNESS_UNSUPPORTED_CALL_PREFIX = "unsupported call: ";
+export const HARNESS_TOOL_RESULT_TEXT = "tool result accepted";
+
+export const HARNESS_RESPONSE_IDS = {
+  toolCall: "resp_m2_harness_tool_call",
+  toolContinuation: "resp_m2_harness_tool_continuation",
+} as const;
+
+export const HARNESS_FUNCTION_CALL_ITEM = {
+  type: "function_call",
+  name: HARNESS_TOOL_NAME,
+  arguments: HARNESS_TOOL_ARGUMENTS,
+  call_id: HARNESS_CALL_ID,
+} as const;
+
+export const HARNESS_TOOL_RESULT_ITEM = {
+  type: "message",
+  role: "assistant",
+  content: [{ type: "output_text", text: HARNESS_TOOL_RESULT_TEXT }],
+} as const;
+
+export const HARNESS_UNKNOWN_TOOL_CALL_SSE = [
+  sseFrame("response.created", {
+    type: "response.created",
+    response: { id: HARNESS_RESPONSE_IDS.toolCall },
+  }),
+  sseFrame("response.output_item.done", {
+    type: "response.output_item.done",
+    item: HARNESS_FUNCTION_CALL_ITEM,
+  }),
+  sseFrame("response.completed", {
+    type: "response.completed",
+    response: {
+      id: HARNESS_RESPONSE_IDS.toolCall,
+      usage: { input_tokens: 12, output_tokens: 4, total_tokens: 16 },
+    },
+  }),
+].join("");
+
+export const HARNESS_UNKNOWN_TOOL_CONTINUATION_SSE = [
+  sseFrame("response.created", {
+    type: "response.created",
+    response: { id: HARNESS_RESPONSE_IDS.toolContinuation },
+  }),
+  sseFrame("response.output_item.done", {
+    type: "response.output_item.done",
+    item: HARNESS_TOOL_RESULT_ITEM,
+  }),
+  sseFrame("response.completed", {
+    type: "response.completed",
+    response: {
+      id: HARNESS_RESPONSE_IDS.toolContinuation,
+      usage: { input_tokens: 20, output_tokens: 5, total_tokens: 25 },
+    },
+  }),
+].join("");
+
 /** Stream body that never reaches `response.completed` (M2-T10). */
 export const TRUNCATED_SSE = [
   sseFrame("response.created", { type: "response.created", response: { id: RESPONSE_IDS.turn1 } }),
